@@ -1,0 +1,274 @@
+
+1. build   #build用于构建docker image  可用选项 -f 指定配置文件 ，默认在当前目录下找 -t 指定tag 最后指定根目录或者指定一个git repo 
+   eg. docker build .
+   eg. docker build https://github.com/xxx
+   eg. docker build -f ./docker-nginx/Dockerfile [path|url]
+   eg. docker build -t [tag name] [path| url]
+#
+# The instruction is not case-sensitive, however convention is for them to be UPPERCASE in order
+# to distinguish them from arguments more easily.
+#
+RUN echo 'we are running some # of cool things'
+
+2. ENV     #设置配置文件中的变量
+
+#Environment variables are notated in the Dockerfile either with $variable_name or ${variable_name}.
+# They are treated equivalently and the brace syntax is typically used to address issues
+#  with variable names with no whitespace, like ${foo}_bar.
+#
+#The ${variable_name} syntax also supports a few of the standard bash modifiers as specified below:
+#
+# ${variable:-word} indicates that if variable is set then the result will be that value.
+#     If variable is not set then word will be the result.
+# ${variable:+word} indicates that if variable is set then word will be the result,
+#     otherwise the result is the empty string.
+
+FROM busybox
+ENV foo /bar
+WORKDIR ${foo}   # WORKDIR /bar
+ADD . $foo       # ADD . /bar
+COPY \$foo /quux # COPY $foo /quux
+
+########Environment variables are supported by the following list of instructions in the Dockerfile:
+
+ADD
+COPY
+ENV
+EXPOSE
+LABEL
+USER
+WORKDIR
+VOLUME
+STOPSIGNAL
+
+ENV abc=hello
+ENV abc=bye def=$abc       # abc=bye def=hello
+ENV ghi=$abc               # ghi=bye
+
+3. .dockeringore file
+
+ *.md
+    !README.md
+#All markdown files except README.md are excluded from the context
+
+4. FROM
+FROM <image>
+Or
+
+FROM <image>:<tag>
+Or
+
+FROM <image>@<digest>
+# from 必须是第一个可用的有效指令， 一个配置文件中from可用出现多次
+
+4.  MAINTAINER  # 指定该image的作者信 
+
+5. RUN
+#RUN has 2 forms:
+#
+#RUN <command> (shell form, the command is run in a shell - /bin/sh -c)
+#RUN ["executable", "param1", "param2"] (exec form)
+#The RUN instruction will execute any commands in a new layer on top of the current image and commit the results.
+# The resulting committed image will be used for the next step in the Dockerfile.
+
+
+The exec form makes it possible to avoid shell string munging, and to RUN commands using a base image that does not contain /bin/sh.
+
+In the shell form you can use a \ (backslash) to continue a single RUN instruction onto the next line. For example, consider these two lines:
+
+RUN /bin/bash -c 'source $HOME/.bashrc ;\
+echo $HOME'
+Together they are equivalent to this single line:
+
+RUN /bin/bash -c 'source $HOME/.bashrc ; echo $HOME'
+Note: To use a different shell, other than ‘/bin/sh’, use the exec form passing in the desired shell. For example, RUN ["/bin/bash", "-c", "echo hello"]
+
+Note: The exec form is parsed as a JSON array, which means that you must use double-quotes (“) around words not single-quotes (‘).
+
+Note: Unlike the shell form, the exec form does not invoke a command shell. This means that normal shell processing does not happen. For example, RUN [ "echo", "$HOME" ] will not do variable substitution on $HOME. If you want shell processing then either use the shell form or execute a shell directly, for example: RUN [ "sh", "-c", "echo", "$HOME" ].
+
+The cache for RUN instructions isn’t invalidated automatically during the next build. The cache for an instruction like RUN apt-get dist-upgrade -y will be reused during the next build. The cache for RUN instructions can be invalidated by using the --no-cache flag, for example docker build --no-cache.
+6.  CMD
+# The CMD instruction has three forms:
+#
+# CMD ["executable","param1","param2"] (exec form, this is the preferred form)
+# CMD ["param1","param2"] (as default parameters to ENTRYPOINT)
+# CMD command param1 param2 (shell form)
+# There can only be one CMD instruction in a Dockerfile. If you list more than one CMD then only the last CMD will take effect. 
+
+# The main purpose of a CMD is to provide defaults for an executing container.
+# These defaults can include an executable, or they can omit the executable,
+# in which case you must specify an ENTRYPOINT instruction as well.
+
+Note: If CMD is used to provide default arguments for the ENTRYPOINT instruction, both the CMD and ENTRYPOINT instructions should be specified with the JSON array format.
+
+If you would like your container to run the same executable every time, then you should consider using ENTRYPOINT in combination with CMD. See ENTRYPOINT.
+
+If the user specifies arguments to docker run then they will override the default specified in CMD.
+
+7. LABEL   # 用来设置标签的 提交到dockerhub之后 可用通过标签搜索到
+LABEL <key>=<value> <key>=<value> <key>=<value> ...
+The LABEL instruction adds metadata to an image. A LABEL is a key-value pair. To include spaces within a LABEL value, use quotes and backslashes as you would in command-line parsing. A few usage examples:
+
+LABEL "com.example.vendor"="ACME Incorporated"
+LABEL com.example.label-with-value="foo"
+LABEL version="1.0"
+LABEL description="This text illustrates \
+that label-values can span multiple lines."
+
+#  To view an image’s labels, use the docker inspect command.
+8.  EXPOSE
+EXPOSE <port> [<port>...]
+The EXPOSE instruction informs Docker that the container listens on the specified network ports at runtime. EXPOSE does not make the ports of the container accessible to the host. To do that, you must use either the -p flag to publish a range of ports or the -P flag to publish all of the exposed ports. You can expose one port number and publish it externally under another number.
+
+To set up port redirection on the host system, see using the -P flag. The Docker network feature supports creating networks without the need to expose ports within the network, for detailed information see the overview of this feature).
+
+9. ENV
+ENV <key> <value>
+ENV <key>=<value> ...
+The ENV instruction sets the environment variable <key> to the value <value>. This value will be in the environment of all “descendent” Dockerfile commands and can be replaced inline in many as well.
+
+The ENV instruction has two forms. The first form, ENV <key> <value>, will set a single variable to a value. The entire string after the first space will be treated as the <value> - including characters such as spaces and quotes.
+
+The second form, ENV <key>=<value> ..., allows for multiple variables to be set at one time. Notice that the second form uses the equals sign (=) in the syntax, while the first form does not. Like command line parsing, quotes and backslashes can be used to include spaces within values.
+
+10. ADD  #添加文件或目录到该image  的指定目录
+ADD has two forms:
+
+ADD <src>... <dest>
+ADD ["<src>",... "<dest>"] (this form is required for paths containing whitespace)
+The ADD instruction copies new files, directories or remote file URLs from <src> and adds them to the filesystem of the container at the path <dest>. 
+
+11.  COPY
+COPY has two forms:
+
+COPY <src>... <dest>
+COPY ["<src>",... "<dest>"] (this form is required for paths containing whitespace)
+The COPY instruction copies new files or directories from <src> and adds them to the filesystem of the container at the path <dest>.
+
+12.  ENTRYPOINT
+ENTRYPOINT has two forms:
+
+ENTRYPOINT ["executable", "param1", "param2"] (exec form, preferred)
+ENTRYPOINT command param1 param2 (shell form)
+An ENTRYPOINT allows you to configure a container that will run as an executable.
+
+For example, the following will start nginx with its default content, listening on port 80:
+
+docker run -i -t --rm -p 80:80 nginx
+Command line arguments to docker run <image> will be appended after all elements in an exec form ENTRYPOINT, and will override all elements specified using CMD. This allows arguments to be passed to the entry point, i.e., docker run <image> -d will pass the -d argument to the entry point. You can override the ENTRYPOINT instruction using the docker run --entrypoint flag.
+
+
+13. VOLUME
+VOLUME ["/data"]
+The VOLUME instruction creates a mount point with the specified name and marks it as holding externally mounted volumes from native host or other containers. The value can be a JSON array, VOLUME ["/var/log/"], or a plain string with multiple arguments, such as VOLUME /var/log or VOLUME /var/log /var/db. For more information/examples and mounting instructions via the Docker client, refer to Share Directories via Volumes documentation.
+
+The docker run command initializes the newly created volume with any data that exists at the specified location within the base image. For example, consider the following Dockerfile snippet:
+
+FROM ubuntu
+RUN mkdir /myvol
+RUN echo "hello world" > /myvol/greeting
+VOLUME /myvol
+
+14. USER
+USER daemon
+The USER instruction sets the user name or UID to use when running the image and for any RUN, CMD and ENTRYPOINT instructions that follow it in the Dockerfile.
+
+15. WORKDIR
+WORKDIR /path/to/workdir
+The WORKDIR instruction sets the working directory for any RUN, CMD, ENTRYPOINT, COPY and ADD instructions that follow it in the Dockerfile.
+
+It can be used multiple times in the one Dockerfile. If a relative path is provided, it will be relative to the path of the previous WORKDIR instruction. For example:
+
+WORKDIR /a
+WORKDIR b
+WORKDIR c
+RUN pwd
+The output of the final pwd command in this Dockerfile would be /a/b/c.
+
+16. ARG
+ARG <name>[=<default value>]
+The ARG instruction defines a variable that users can pass at build-time to the builder with the docker build command using the --build-arg <varname>=<value> flag. If a user specifies a build argument that was not defined in the Dockerfile, the build outputs an error.
+
+One or more build-args were not consumed, failing build.
+
+
+Docker has a set of predefined ARG variables that you can use without a corresponding ARG instruction in the Dockerfile.
+
+HTTP_PROXY
+http_proxy
+HTTPS_PROXY
+https_proxy
+FTP_PROXY
+ftp_proxy
+NO_PROXY
+no_proxy
+To use these, simply pass them on the command line using the --build-arg <varname>=<value> flag.
+
+
+17.  ONBUILD  # 还不明白，日后需要在仔细学学 
+ONBUILD [INSTRUCTION]
+The ONBUILD instruction adds to the image a trigger instruction to be executed at a later time, when the image is used as the base for another build. The trigger will be executed in the context of the downstream build, as if it had been inserted immediately after the FROM instruction in the downstream Dockerfile.
+
+Any build instruction can be registered as a trigger.
+
+This is useful if you are building an image which will be used as a base to build other images, for example an application build environment or a daemon which may be customized with user-specific configuration.
+
+Here’s how it works:
+
+When it encounters an ONBUILD instruction, the builder adds a trigger to the metadata of the image being built. The instruction does not otherwise affect the current build.
+At the end of the build, a list of all triggers is stored in the image manifest, under the key OnBuild. They can be inspected with the docker inspect command.
+Later the image may be used as a base for a new build, using the FROM instruction. As part of processing the FROM instruction, the downstream builder looks for ONBUILD triggers, and executes them in the same order they were registered. If any of the triggers fail, the FROM instruction is aborted which in turn causes the build to fail. If all triggers succeed, the FROM instruction completes and the build continues as usual.
+Triggers are cleared from the final image after being executed. In other words they are not inherited by “grand-children” builds.
+
+18.  
+
+Commands:
+    attach    Attach to a running container                 # 当前 shell 下 attach 连接指定运行镜像
+    build     Build an image from a Dockerfile              # 通过 Dockerfile 定制镜像
+    commit    Create a new image from a container's changes # 提交当前容器为新的镜像
+    cp        Copy files/folders from the containers filesystem to the host path
+              # 从容器中拷贝指定文件或者目录到宿主机中
+    create    Create a new container                        # 创建一个新的容器，同 run，但不启动容器
+    diff      Inspect changes on a container's filesystem   # 查看 docker 容器变化
+    events    Get real time events from the server          # 从 docker 服务获取容器实时事件
+    exec      Run a command in an existing container        # 在已存在的容器上运行命令
+    export    Stream the contents of a container as a tar archive   
+              # 导出容器的内容流作为一个 tar 归档文件[对应 import ]
+    history   Show the history of an image                  # 展示一个镜像形成历史
+    images    List images                                   # 列出系统当前镜像
+    import    Create a new filesystem image from the contents of a tarball  
+              # 从tar包中的内容创建一个新的文件系统映像[对应 export]
+    info      Display system-wide information               # 显示系统相关信息
+    inspect   Return low-level information on a container   # 查看容器详细信息
+    kill      Kill a running container                      # kill 指定 docker 容器
+    load      Load an image from a tar archive              # 从一个 tar 包中加载一个镜像[对应 save]
+    login     Register or Login to the docker registry server   
+              # 注册或者登陆一个 docker 源服务器
+    logout    Log out from a Docker registry server         # 从当前 Docker registry 退出
+    logs      Fetch the logs of a container                 # 输出当前容器日志信息
+    port      Lookup the public-facing port which is NAT-ed to PRIVATE_PORT
+              # 查看映射端口对应的容器内部源端口
+    pause     Pause all processes within a container        # 暂停容器
+    ps        List containers                               # 列出容器列表
+    pull      Pull an image or a repository from the docker registry server
+              # 从docker镜像源服务器拉取指定镜像或者库镜像
+    push      Push an image or a repository to the docker registry server
+              # 推送指定镜像或者库镜像至docker源服务器
+    restart   Restart a running container                   # 重启运行的容器
+    rm        Remove one or more containers                 # 移除一个或者多个容器
+    rmi       Remove one or more images                 
+              # 移除一个或多个镜像[无容器使用该镜像才可删除，否则需删除相关容器才可继续或 -f 强制删除]
+    run       Run a command in a new container
+              # 创建一个新的容器并运行一个命令
+    save      Save an image to a tar archive                # 保存一个镜像为一个 tar 包[对应 load]
+    search    Search for an image on the Docker Hub         # 在 docker hub 中搜索镜像
+    start     Start a stopped containers                    # 启动容器
+    stop      Stop a running containers                     # 停止容器
+    tag       Tag an image into a repository                # 给源中镜像打标签
+    top       Lookup the running processes of a container   # 查看容器中运行的进程信息
+    unpause   Unpause a paused container                    # 取消暂停容器
+    version   Show the docker version information           # 查看 docker 版本号
+    wait      Block until a container stops, then print its exit code   
+              # 截取容器停止时的退出状态值
+Run 'docker COMMAND --help' for more information on a command.
